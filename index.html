@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer"><meta name="theme-color" content="#211733">
+<title>Amigo Oculto ✨</title>
+<style>
+:root{color-scheme:dark;--text:#fff8ff;--muted:#cfc1dd;--gold:#ffe1a0}
+*{box-sizing:border-box}body{min-height:100svh;margin:0;padding:24px;display:grid;place-items:center;color:var(--text);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:radial-gradient(ellipse at 10% 5%,#5a3863,transparent 52%),radial-gradient(ellipse at 90% 98%,#274365,transparent 48%),#19172c}
+main{width:min(100%,520px)}header{text-align:center;margin-bottom:25px}.eyebrow{color:var(--gold);font-size:12px;text-transform:uppercase;letter-spacing:.24em;font-weight:800}h1{font-size:clamp(44px,10vw,70px);line-height:1;margin:9px 0 16px;letter-spacing:-.06em}h1 span{color:var(--gold)}.sub{color:var(--muted);font-size:15px;line-height:1.6}.card{border:1px solid #ffffff2b;border-radius:28px;background:linear-gradient(135deg,#39304f,#29243f);padding:clamp(24px,6vw,38px);box-shadow:0 25px 80px #0005;text-align:center}.gift{font-size:64px;display:block;margin-bottom:17px}h2{font-size:28px;margin:0 0 9px;letter-spacing:-.03em}.explain{color:var(--muted);font-size:15px;line-height:1.6}.name{color:var(--gold);font-size:clamp(38px,9vw,55px);font-weight:900;letter-spacing:-.045em;margin:13px 0;overflow-wrap:anywhere}.label{font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);font-size:12px;margin-top:20px}button{width:100%;border:0;border-radius:15px;padding:17px 20px;font-size:16px;font-weight:800;cursor:pointer;color:#35223a;background:linear-gradient(90deg,#ffe5ac,#f5b98a);margin-top:24px}button:disabled{opacity:.55;cursor:wait}.hidden{display:none!important}.error{color:#ffbbc9}.footer{color:#a99db7;text-align:center;font-size:12px;line-height:1.5;margin-top:22px}.loader{display:inline-block;width:18px;height:18px;border:2px solid #fff5;border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}.confetti{position:fixed;top:-20px;width:9px;height:14px;pointer-events:none;animation:fall 3s linear forwards}@keyframes fall{to{transform:translateY(110vh) rotate(820deg);opacity:0}}@media(prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+</head>
+<body><main><header><p class="eyebrow">Uma surpresa entre amigos ✨</p><h1>Amigo <span>Oculto</span></h1><p class="sub">Seu amigo secreto está esperando por você. 🤫</p></header>
+<section class="card" aria-live="polite">
+<div id="loading"><span class="gift">🎄</span><h2>Conferindo seu convite...</h2><p class="explain"><span class="loader" aria-hidden="true"></span> Um instante.</p></div>
+<div id="invalid" class="hidden"><span class="gift">🔒</span><h2>Convite inválido</h2><p id="invalid-detail" class="explain error">Peça seu link pessoal ao organizador do sorteio.</p></div>
+<div id="welcome" class="hidden"><span class="gift">🎁</span><p class="explain">Este convite é exclusivo para</p><h2 id="person"></h2><p class="explain">Seu amigo oculto já foi sorteado e não vai mudar. Pronto para descobrir?</p><button id="reveal">✨ Revelar meu amigo oculto</button></div>
+<div id="result" class="hidden"><span class="gift">🎉</span><p id="greeting" class="explain"></p><p class="label">Você tirou</p><p id="friend" class="name"></p><p class="explain">🤫 Guarde segredo! Se voltar com este mesmo link, o resultado será igual.</p></div>
+</section><p class="footer">💜 Cada pessoa tem seu próprio link. Se você compartilhar o seu, quem receber também poderá ver seu resultado.</p></main>
+<script src="config.js"></script>
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+const show=id=>{for(const s of ['loading','invalid','welcome','result'])$(s).classList.toggle('hidden',s!==id)};
+const config=window.AMIGO_CONFIG||{};
+const token=decodeURIComponent(location.hash.slice(1)).replace(/^convite=/,'').trim();
+let participant='';
+function fail(message){$('invalid-detail').textContent=message;show('invalid')}
+async function rpc(functionName){
+ const res=await fetch(config.supabaseUrl.replace(/\/$/,'')+'/rest/v1/rpc/'+functionName,{
+ method:'POST',headers:{'Content-Type':'application/json','apikey':config.publishableKey},
+ body:JSON.stringify({p_token:token}),cache:'no-store',referrerPolicy:'no-referrer'});
+ if(!res.ok)throw new Error('Falha no serviço ('+res.status+').');
+ return await res.json();
+}
+async function init(){
+ if(!token||!(/^[a-zA-Z0-9_-]{32,100}$/.test(token))){fail('Este convite não é válido. Peça seu link pessoal ao organizador.');return}
+ if(!/^https:\/\/.+\.supabase\.co$/.test(config.supabaseUrl||'')||!config.publishableKey||config.publishableKey.includes('COLE_AQUI')){fail('O organizador ainda precisa configurar o banco de dados.');return}
+ try{const data=await rpc('identificar_convidado');if(!data||!data.nome){fail('Link não reconhecido. Peça o convite correto ao organizador.');return}participant=data.nome;$('person').textContent=participant;show('welcome')}
+ catch(e){fail('Não foi possível acessar o sorteio. Verifique a conexão ou fale com o organizador.')}
+}
+$('reveal').addEventListener('click',async()=>{
+ const btn=$('reveal');btn.disabled=true;btn.textContent='Consultando resultado...';
+ try{const data=await rpc('revelar_amigo');if(!data||!data.amigo){throw new Error('Resultado indisponível')}
+ $('greeting').textContent=participant+', sua missão chegou!';$('friend').textContent=data.amigo;show('result');
+ if(!matchMedia('(prefers-reduced-motion: reduce)').matches){for(let i=0;i<42;i++){const e=document.createElement('i');e.className='confetti';e.style.left=Math.random()*100+'vw';e.style.background=['#ffd98b','#f598c4','#b3d8ff','#d6b5ff'][i%4];e.style.animationDelay=Math.random()*.7+'s';document.body.append(e);setTimeout(()=>e.remove(),4000)}}
+ }catch(e){btn.disabled=false;btn.textContent='✨ Tentar novamente';alert('Não conseguimos revelar agora. Confira a conexão e tente novamente.')}
+});
+init();
+</script></body></html>
